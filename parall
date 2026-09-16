@@ -99,7 +99,7 @@ parall () {
     warning "Running command: $command_string"
     warning "Iterables: $iterables"
     [ $verbose -eq 1 ] && warning "Using $jobs jobs" || :
-    warning "Proceed? (y/N)"
+    warning "Proceed? (y/[n])"
     read -r answer
     if [[ ! "$answer" =~ ^[Yy]$ ]]; then
         info "Aborting"
