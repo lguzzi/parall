@@ -6,3 +6,6 @@ chmod +wxr parall
 source parall
 parall -h
 ```
+
+requirements: 
+- xargs
