@@ -1,35 +1,36 @@
-#!/bin/sh
+#!/usr/bin/env bash
 # made by Luca Guzzi ft. AI
 
 parall () {
-    if ! command -v xargs >/dev/null 2>&1; then
-        echo "parall.error xargs is not installed and is required for parall" >&2
-        return 1
-    fi
     local msg() {
-        echo "$1 $2"
+        printf '%b %s\n' "$1" "$2"
     }
     local info() {
         msg "\e[0;32mparall.info\e[0m" "$1"
     }
     local error() {
-        msg "\e[0;31mparall.error\e[0m" "$1"
+        msg "\e[0;31mparall.error\e[0m" "$1" >&2
     }
     local warning() {
         msg "\e[0;33mparall.warning\e[0m" "$1"
     }
+    if ! command -v xargs >/dev/null 2>&1; then
+        error "xargs is not installed and is required for parall"
+        return 1
+    fi
     local jobs=1
     local command=""
     local verbose=0
+    local -a iterables=()
     while [ "$#" -gt 0 ]; do
         case "$1" in
             -h) 
-                echo "parall - Run commands in parallel using xargs"
-                echo "Usage: parall [-j N] [-v] [-c command] [-i iterable1 iterable2 ...]"
-                echo "  -j N        Number of jobs to run in parallel (default: 1)"
-                echo "  -v          Enable verbose output (default: off)"
-                echo "  -c command  Command to run for each iterable (required)"
-                echo "  -i iterable1 iterable2 ...  List of iterables to process (required)"
+                printf "parall - Run commands in parallel using xargs"
+                printf "Usage: parall [-j N] [-v] [-c command] [-i iterable1 iterable2 ...]"
+                printf "  -j N        Number of jobs to run in parallel (default: 1)"
+                printf "  -v          Enable verbose output (default: off)"
+                printf "  -c command  Command to run for each iterable (required)"
+                printf "  -i iterable1 iterable2 ...  List of iterables to process (required)"
                 return 0
                 ;;
             -j)
@@ -61,13 +62,17 @@ parall () {
                     error "Missing value for -i"
                     return 1
                 }
-                local iterables=$2
-                shift 2
+                shift
 
-                while [ "$#" -gt 0 ] && [ "${1#-}" = "$1" ]; do
-                    iterables="$iterables $1"
+                while [ "$#" -gt 0 ] && [[ "$1" != -* ]]; do
+                    iterables+=("$1")
                     shift
                 done
+                ;;
+            --)
+                shift
+                iterables+=("$@")
+                break
                 ;;
             *)
                 error "Unknown option: $1"
@@ -81,6 +86,9 @@ parall () {
         return 1
     }
 
+    ((${#iterables[@]})) || { error "No iterables specified"; return 1; }
+
+
     case "$jobs" in
         ''|*[!0-9]*|0)
             error "Jobs must be a positive integer"
@@ -88,16 +96,15 @@ parall () {
             ;;
     esac
 
-    if [ "$verbose" -eq 1 ]; then
-        info "Running command: $command_string"
-        info "Using $jobs jobs"
-        info "Iterables: $iterables"
+    warning "Running command: $command_string"
+    warning "Iterables: $iterables"
+    [ $verbose -eq 1 ] && warning "Using $jobs jobs" || :
+    warning "Proceed? (y/N)"
+    read -r answer
+    if [[ ! "$answer" =~ ^[Yy]$ ]]; then
+        info "Aborting"
+        return 0
     fi
 
-    for iterable in $iterables; do
-        if [ "$verbose" -eq 1 ]; then
-            info "Processing iterable: $iterable"
-        fi
-        echo "$command_string" | xargs -I {} -P "$jobs" sh -c "{} $iterable"
-    done
+    printf '%s\0' "${iterables[@]}" | xargs -0 -r -n 1 -P "$jobs" bash -c "$command_string \"\$1\"" _
 }
