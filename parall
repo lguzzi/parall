@@ -1,17 +1,17 @@
 #!/usr/bin/env bash
 # made by Luca Guzzi ft. AI
 
-parall () {
-    local msg() {
+parall () (
+    msg() {
         printf '%b %s\n' "$1" "$2"
     }
-    local info() {
+    info() {
         msg "\e[0;32mparall.info\e[0m" "$1"
     }
-    local error() {
+    error() {
         msg "\e[0;31mparall.error\e[0m" "$1" >&2
     }
-    local warning() {
+    warning() {
         msg "\e[0;33mparall.warning\e[0m" "$1"
     }
     if ! command -v xargs >/dev/null 2>&1; then
@@ -19,19 +19,29 @@ parall () {
         return 1
     fi
     local jobs=1
-    local command=""
+    local command_string=""
     local verbose=0
     local -a iterables=()
+    local condor_config=""
     while [ "$#" -gt 0 ]; do
         case "$1" in
             -h) 
-                printf "parall - Run commands in parallel using xargs\\n"
-                printf "Usage: parall [-j N] [-v] [-c command] [-i iterable1 iterable2 ...]\\n"
-                printf "  -j N        Number of jobs to run in parallel (default: 1)\\n"
-                printf "  -v          Enable verbose output (default: off)\\n"
-                printf "  -c command  Command to run for each iterable (required)\\n"
-                printf "  -i iterable1 iterable2 ...  List of iterables to process (required)\\n"
+                printf "parall - Run commands in parallel using xargs\n"
+                printf "Usage: parall [-j N] [-v] [-d file.cfg] -c command -i iterables ...\n"
+                printf "  -j N        Number of jobs to run in parallel (default: 1)\n"
+                printf "  -v          Enable verbose output (default: off)\n"
+                printf "  -c command  Command to run for each iterable (required)\n"
+                printf "  -i iterable1 iterable2 ...  List of iterables to process (required)\n"
+                printf " -d file.cfg Distribute the command on the HTCondor cluster using the specified configuration file\n"
                 return 0
+                ;;
+            -d)
+                [ "$#" -ge 2 ] || {
+                    error "Missing value for -d"
+                    return 1
+                }
+                condor_config=$2
+                shift 2
                 ;;
             -j)
                 [ "$#" -ge 2 ] || {
@@ -54,7 +64,7 @@ parall () {
                     error "Missing value for -c"
                     return 1
                 }
-                local command_string=$2
+                command_string=$2
                 shift 2
                 ;;
             -i)
@@ -80,24 +90,35 @@ parall () {
                 ;;
         esac
     done
-
-    [ -n "$command_string" ] || {
-        error "No command specified"
+    
+    [ -n "$condor_config" ] && {
+        if ! command -v condor_submit >/dev/null 2>&1; then
+            error "condor_submit is not installed and is required for HTCondor distribution"
+            return 1
+        fi
+        if [ ! -f "$condor_config" ]; then
+            error "HTCondor configuration file '$condor_config' does not exist"
+            return 1
+        fi
+        error "HTCondor distribution is not implemented yet"
         return 1
     }
 
-    ((${#iterables[@]})) || { error "No iterables specified"; return 1; }
-
-
-    case "$jobs" in
-        ''|*[!0-9]*|0)
-            error "Jobs must be a positive integer"
-            return 1
-            ;;
-    esac
+    [ -n "$command_string" ] || { 
+        error "No command specified"
+        return 1
+    }
+    ((${#iterables[@]} > 0)) || {
+        error "No iterables specified"
+        return 1
+    }
+    [[ "$jobs" =~ ^[1-9][0-9]*$ ]] || {
+        error "Jobs must be a positive integer"
+        return 1
+    }
 
     warning "Running command: $command_string"
-    warning "Iterables: $iterables"
+    warning "Iterables: ${iterables[*]}"
     [ $verbose -eq 1 ] && warning "Using $jobs jobs" || :
     warning "Proceed? (y/[n])"
     read -r answer
@@ -106,5 +127,6 @@ parall () {
         return 0
     fi
 
-    printf '%s\0' "${iterables[@]}" | xargs -0 -r -n 1 -P "$jobs" bash -c "$command_string \"\$1\"" _
-}
+    printf '%s\0' "${iterables[@]}" | 
+        xargs -0 -r -n 1 -P "$jobs" bash -c "$command_string \"\$1\"" _
+)
