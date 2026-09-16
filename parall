@@ -25,12 +25,12 @@ parall () {
     while [ "$#" -gt 0 ]; do
         case "$1" in
             -h) 
-                printf "parall - Run commands in parallel using xargs"
-                printf "Usage: parall [-j N] [-v] [-c command] [-i iterable1 iterable2 ...]"
-                printf "  -j N        Number of jobs to run in parallel (default: 1)"
-                printf "  -v          Enable verbose output (default: off)"
-                printf "  -c command  Command to run for each iterable (required)"
-                printf "  -i iterable1 iterable2 ...  List of iterables to process (required)"
+                printf "parall - Run commands in parallel using xargs\\n"
+                printf "Usage: parall [-j N] [-v] [-c command] [-i iterable1 iterable2 ...]\\n"
+                printf "  -j N        Number of jobs to run in parallel (default: 1)\\n"
+                printf "  -v          Enable verbose output (default: off)\\n"
+                printf "  -c command  Command to run for each iterable (required)\\n"
+                printf "  -i iterable1 iterable2 ...  List of iterables to process (required)\\n"
                 return 0
                 ;;
             -j)
