@@ -1,0 +1,103 @@
+#!/bin/sh
+# made by Luca Guzzi ft. AI
+
+parall () {
+    if ! command -v xargs >/dev/null 2>&1; then
+        echo "parall.error xargs is not installed and is required for parall" >&2
+        return 1
+    fi
+    local msg() {
+        echo "$1 $2"
+    }
+    local info() {
+        msg "\e[0;32mparall.info\e[0m" "$1"
+    }
+    local error() {
+        msg "\e[0;31mparall.error\e[0m" "$1"
+    }
+    local warning() {
+        msg "\e[0;33mparall.warning\e[0m" "$1"
+    }
+    local jobs=1
+    local command=""
+    local verbose=0
+    while [ "$#" -gt 0 ]; do
+        case "$1" in
+            -h) 
+                echo "parall - Run commands in parallel using xargs"
+                echo "Usage: parall [-j N] [-v] [-c command] [-i iterable1 iterable2 ...]"
+                echo "  -j N        Number of jobs to run in parallel (default: 1)"
+                echo "  -v          Enable verbose output (default: off)"
+                echo "  -c command  Command to run for each iterable (required)"
+                echo "  -i iterable1 iterable2 ...  List of iterables to process (required)"
+                return 0
+                ;;
+            -j)
+                [ "$#" -ge 2 ] || {
+                    error "Missing value for -j"
+                    return 1
+                }
+                jobs=$2
+                shift 2
+                ;;
+            -j?*)
+                jobs=${1#-j}
+                shift
+                ;;
+            -v)
+                verbose=1
+                shift
+                ;;
+            -c)
+                [ "$#" -ge 2 ] || {
+                    error "Missing value for -c"
+                    return 1
+                }
+                local command_string=$2
+                shift 2
+                ;;
+            -i)
+                [ "$#" -ge 2 ] || {
+                    error "Missing value for -i"
+                    return 1
+                }
+                local iterables=$2
+                shift 2
+
+                while [ "$#" -gt 0 ] && [ "${1#-}" = "$1" ]; do
+                    iterables="$iterables $1"
+                    shift
+                done
+                ;;
+            *)
+                error "Unknown option: $1"
+                return 1
+                ;;
+        esac
+    done
+
+    [ -n "$command_string" ] || {
+        error "No command specified"
+        return 1
+    }
+
+    case "$jobs" in
+        ''|*[!0-9]*|0)
+            error "Jobs must be a positive integer"
+            return 1
+            ;;
+    esac
+
+    if [ "$verbose" -eq 1 ]; then
+        info "Running command: $command_string"
+        info "Using $jobs jobs"
+        info "Iterables: $iterables"
+    fi
+
+    for iterable in $iterables; do
+        if [ "$verbose" -eq 1 ]; then
+            info "Processing iterable: $iterable"
+        fi
+        echo "$command_string" | xargs -I {} -P "$jobs" sh -c "{} $iterable"
+    done
+}
